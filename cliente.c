@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
         fgets(input, sizeof(input), stdin);
         //envia los datos al servidor 
         send(mi_socket, input, strlen(input), 0);
-
+        //tonto el que lo leea 
         if (atoi(input) == 5) break;
 
         memset(buffer, 0, sizeof(buffer));
