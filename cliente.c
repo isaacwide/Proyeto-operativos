@@ -1,65 +1,96 @@
-#include <unistd.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
+#include <unistd.h>          // Para read(), write(), close()
+#include <netinet/in.h>      // Para struct sockaddr_in
+#include <arpa/inet.h>       // Para inet_aton()
+#include <sys/types.h>       // Para tipos de datos
+#include <sys/socket.h>      // Para funciones de socket
+#include <stdlib.h>          // Para exit(), atoi()
+#include <stdio.h>           // Para printf(), perror()
+#include <string.h>          // Para memset(), strlen()
 
-#define SIZE 1024
+#define BUFFER_SIZE 1024     // Tamaño del buffer de comunicación
 
 int main(int argc, char *argv[]) {
-    int mi_socket, tam;
-    char buffer[SIZE] = {0};
-    char input[100];  // <-- Declaramos input
-    struct sockaddr_in mi_estructura;
-
+    int socket_cliente;      // Descriptor del socket
+    socklen_t tam;           // Tamaño de la estructura de dirección
+    char buffer[BUFFER_SIZE] = {0};  // Buffer para datos recibidos
+    char input[100] = {0};   // Buffer para entrada del usuario
+    
+    // Verificación de argumentos
     if (argc != 3) {
-        printf("Error: modo de empleo: %s <IP> <PUERTO>\n", argv[0]);
+        printf("Uso correcto: %s <DIRECCION_IP> <PUERTO>\n", argv[0]);
+        printf("Ejemplo: %s 127.0.0.1 8080\n", argv[0]);
         exit(-1);
     }
 
     // Configuración de la estructura del servidor
-    mi_estructura.sin_family = AF_INET;
-    mi_estructura.sin_port = htons(atoi(argv[2]));
-    inet_aton(argv[1], &(mi_estructura.sin_addr));
-    memset(&(mi_estructura.sin_zero), '\0', 8);
+    struct sockaddr_in dir_servidor;
+    dir_servidor.sin_family = AF_INET;                     // Familia IPv4
+    dir_servidor.sin_port = htons(atoi(argv[2]));          // Puerto del servidor
+    inet_aton(argv[1], &(dir_servidor.sin_addr));          // Dirección IP
+    memset(&(dir_servidor.sin_zero), '\0', 8);             // Relleno con ceros
 
-    // Crear socket
-    mi_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (mi_socket == -1) {
-        perror("Error creando socket");
+    // Creación del socket TCP
+    socket_cliente = socket(AF_INET, SOCK_STREAM, 0);
+    if (socket_cliente == -1) {
+        perror("Error al crear el socket");
         exit(1);
     }
 
-    // Conectar al servidor
+    // Conexión al servidor
     tam = sizeof(struct sockaddr);
-    if (connect(mi_socket, (struct sockaddr *)&mi_estructura, tam) == -1) {
-        perror("Error en connect");
+    printf("Conectando al servidor %s:%s...\n", argv[1], argv[2]);
+    if (connect(socket_cliente, (struct sockaddr *)&dir_servidor, tam) == -1) {
+        perror("Error al conectar con el servidor");
         exit(1);
     }
+    printf("Conexión establecida. Bienvenido a la tienda de videojuegos!\n");
 
-    // Bucle de comunicación con el servidor
+    // Bucle principal de interacción con el servidor
     while (1) {
-        memset(buffer, 0, sizeof(buffer));
-        //lee lo que envia el servidor 
-        read(mi_socket, buffer, sizeof(buffer));
-        printf("%s", buffer);
+        // Recibe y muestra el menú del servidor
+        memset(buffer, 0, BUFFER_SIZE);
+        if (read(socket_cliente, buffer, BUFFER_SIZE) <= 0) {
+            perror("Error al recibir datos del servidor");
+            break;
+        }
+        printf("%s", buffer);  // Muestra el menú recibido
 
+        // Obtiene la selección del usuario
         printf("> ");
-        //toma lo que escriba el usuario 
         fgets(input, sizeof(input), stdin);
-        //envia los datos al servidor 
-        send(mi_socket, input, strlen(input), 0);
-        //tonto el que lo leea 
-        if (atoi(input) == 5) break;
+        
+        // Envía la selección al servidor
+        if (send(socket_cliente, input, strlen(input), 0) <= 0) {
+            perror("Error al enviar datos al servidor");
+            break;
+        }
+        if(atoi(input)==4){
+            memset(buffer, 0, BUFFER_SIZE);
+            if (read(socket_cliente, buffer, BUFFER_SIZE) <= 0) {
+                perror("Error al recibir datos del servidor");
+                break;
+            }
+            printf("%s", buffer);  // Muestra el menú recibido
+              
 
-        memset(buffer, 0, sizeof(buffer));
-        read(mi_socket, buffer, sizeof(buffer));
-        printf("%s\n", buffer);
+         }
+        // Si el usuario elige salir (opción 4), termina el bucle
+        if (atoi(input) == 5) {
+            printf("Saliendo de la tienda...\n");
+            break;
+        }
+
+        // Recibe y muestra la respuesta del servidor
+        memset(buffer, 0, BUFFER_SIZE);
+        if (read(socket_cliente, buffer, BUFFER_SIZE) <= 0) {
+            perror("Error al recibir respuesta del servidor");
+            break;
+        }
+        printf("%s\n", buffer);  // Muestra la respuesta del servidor
     }
 
-    close(mi_socket);
+    // Cierre limpio de la conexión
+    close(socket_cliente);
+    printf("Conexión cerrada. Hasta pronto!\n");
     return 0;
 }
