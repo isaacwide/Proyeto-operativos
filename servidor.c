@@ -93,6 +93,7 @@ void manejar_cliente(int cliente) {
         if (recibido <= 0) break;  // Si hay error o cierre, sale del bucle
 
         int opcion = atoi(buffer);  // Convierte la entrada a número
+        printf("Cliente %d seleccionó la opción: %d\n", cliente, opcion);//Muestra qué opción seleccionó el cliente
         char respuesta[256];       // Buffer para la respuesta al cliente
 
         // Procesa la opción seleccionada
@@ -108,6 +109,8 @@ void manejar_cliente(int cliente) {
                        "Añadido: %s - $%.2f\n", 
                        products[opcion-1].nombre, 
                        products[opcion-1].precio);
+                //Muestra qué producto agregó
+                printf("Cliente %d agregó al carrito: %s\n", cliente, products[opcion - 1].nombre);
             } else {
                 strcpy(respuesta, "Carrito lleno. No se pueden añadir más productos.\n");
             }
@@ -115,6 +118,8 @@ void manejar_cliente(int cliente) {
 
         } else if (opcion == num_products + 1) {  // opcion para ver lo que se ha guardo
 
+                //Muestra que pidió ver la canasta
+                printf("Cliente %d solicitó ver la canasta.\n", cliente);
                 mostrar_carrito(cliente);
                 continue;
             
@@ -122,6 +127,9 @@ void manejar_cliente(int cliente) {
         } else if (opcion == num_products + 2) {
             
             strcpy(respuesta, "Opción inválida. Intente nuevamente.\n");
+        }else if (opcion == 5) {//el cliente se desconectó y lo muestra
+            printf("Cliente %d se desconectó.\n", cliente);
+            break;
         }
 
         
