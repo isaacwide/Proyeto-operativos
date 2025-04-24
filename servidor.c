@@ -7,6 +7,7 @@
 #include <string.h>          
 #include <stdio.h>           
 #define MAX_CARRITO 15 
+
 #define MENU_PRINCIPAL 0
 #define MENU_CATEGORIAS 1
 #define MENU_MARCAS 2
