@@ -6,6 +6,31 @@
 #include <stdlib.h>          // Para exit(), atoi()
 #include <string.h>          // Para strcpy(), strcat(), memset()
 #include <stdio.h>           // Para printf(), perror()
+
+
+// Estructura que define un producto de la tienda
+struct producto {
+    char nombre[50];        // Nombre del producto (máx 50 caracteres)
+    float precio;           // Precio del producto
+};
+
+
+enum Categoria{
+    TELEFONOS,
+    LAPTOPS,
+    VIDEOJUEGOS
+};
+
+
+
+//Estructura para agrupar productos por categoria
+struct CategoriaProductos{
+    char nombre[50];
+    struct producto *productos;
+    int num_productos;
+};
+
+
 struct producto samsung[] = {
     {"Galaxy S24 Ultra", 27999.00},
     {"Galaxy S24+", 21999.00},
@@ -16,7 +41,7 @@ struct producto samsung[] = {
     {"Galaxy A34 5G", 7499.00},
     {"Galaxy A14 5G", 4999.00},
     {"Galaxy M54 5G", 8499.00},
-    {"Galaxy M34 5G", 6499.00},
+    {"Galaxy M34 5G", 6499.00}
    
 };
 struct producto apple[] = {
@@ -53,7 +78,7 @@ struct producto huawei[] = {
     {"Huawei Enjoy 60X (128GB)", 5499.00},      
     {"Huawei Enjoy 50z (64GB)", 4499.00},
     {"Huawei P40 Pro (128GB Reacond.)", 8999.00}, 
-    {"Huawei MatePad 11 (128GB+LTE)", 12999.00} t
+    {"Huawei MatePad 11 (128GB+LTE)", 12999.00} 
 };
 struct producto oppo[] = {
     {"OPPO Find X6 Pro (256GB)", 24999.00},    
@@ -167,12 +192,13 @@ struct producto nintendo[] = {
 };
 
 
-// Estructura que define un producto de la tienda
-struct producto {
-    char nombre[50];        // Nombre del producto (máx 50 caracteres)
-    float precio;           // Precio del producto
-};
+struct CategoriaProductos categorias[]={
+    {"Telefonos", NULL, 0},
+    {"Laptops", NULL, 0},
+    {"Videojuegos", NULL, 0}
+}
 
+/*
 // Lista de productos disponibles en la tienda
 struct producto products[] = {
     {"Zelda BOTW", 1399},   // Producto 1
@@ -181,7 +207,7 @@ struct producto products[] = {
 };
 // Calcula el número de productos en el array
 const int num_products = sizeof(products)/sizeof(products[0]);
-
+*/
 struct producto carrito[30]={};
 
 int total = 0 ;
@@ -191,22 +217,39 @@ float total_pagar=0;
  * @param sock El descriptor de socket del cliente conectado
  */
 void enviar_menu(int sock) {
-    char menu[1024] = "\n=== MENÚ DE PRODUCTOS ===\n";
-    
+    char menu[2048] = "\n=== MENÚ DE PRODUCTOS ===\n";
+    strcat(menu, "Categorias disponibles: \n");
     // Construye el menú iterando sobre los productos
-    for (int i = 0; i < num_products; i++) {
+    for (int i = 0; i < 3; i++) {
         char item[100];
         // Formatea cada producto con su número, nombre y precio
-        snprintf(item, sizeof(item), "%d. %s - $%.2f\n", i+1, products[i].nombre, products[i].precio);
+        snprintf(item, sizeof(item), "%d. %s\n", i+1, categorias[i].nombre);
         strcat(menu, item);  // Añade el producto al menú
     }
     // Añade la opción para salir
     strcat(menu,"4.-ver canasta \n");
-    strcat(menu, "5. Salir\nSeleccione una opción: ");
+    strcat(menu, "5. Salir\nSeleccione una categoria: ");
     
     // Envía el menú completo al cliente
     send(sock, menu, strlen(menu), 0);
 }
+
+void enviar_productos(int sock, int categoria){
+    char menu[2048];
+    snprintf(menu, sizeof (menu), "\n=== %s ===\n", categorias[categoria].nombre);
+    //Se hace la lista de productos de la categoria que se seleccionó
+    for (int i = 0; i < categorias[categoria].num_productos; i++){
+        char item[100];
+        snprintf(item, sizeof(item), "%d. %s - $%.2f\n", i+1, categorias[categoria].productos[i].nombre, 
+                categorias[categoria].productos[i].precio);
+        strcat(menu, item);  
+    }
+    strcat(menu, "0. Volver al menu principal\n");
+    strcat(menu, "Seleccione un producto: ");
+    send (sock, menu, strlen(menu), 0);
+}
+
+
 
 /**
  * Función que maneja la interacción con un cliente
@@ -217,7 +260,7 @@ void enviar_menu(int sock) {
  */
 //funcion para manejar el cliente 
  void mostrar_carrito(int cliente){
-    char p[1024] ="tus productos\n";
+    char p[2048] ="tus productos\n";
     float t=0.0;
     if(total==0){
         strcat(p, "El carrito está vacío\n");
@@ -229,7 +272,7 @@ void enviar_menu(int sock) {
             strcat(p, item);
             t += carrito[i].precio;
         }
-        char total_msg[50];
+        char total_msg[100];
         snprintf(total_msg, sizeof(total_msg), "\nTotal a pagar: $%.2f\n", t);
         strcat(p, total_msg);
 
@@ -239,7 +282,7 @@ void enviar_menu(int sock) {
 
 
 
-void manejar_cliente(int cliente) {
+/*void manejar_cliente(int cliente) {
     char buffer[1024];  // Buffer para almacenar datos recibidos
     
     while (1) {  // Bucle infinito hasta que el cliente elija salir
@@ -301,12 +344,108 @@ void manejar_cliente(int cliente) {
     // Cierra el socket del cliente y termina el proceso hijo
     close(cliente);
     exit(0);
+} */
+
+void manejar_cliente(int cliente) {
+    char buffer[1024];
+    int categoria_seleccionada = -1; // -1 = en menú principal
+
+    while (1) {
+        if (categoria_seleccionada == -1) {
+            enviar_menu(cliente);
+        } else {
+            enviar_productos(cliente, categoria_seleccionada);
+        }
+
+        memset(buffer, 0, sizeof(buffer));
+        if (recv(cliente, buffer, sizeof(buffer), 0) <= 0) break;
+
+        int opcion = atoi(buffer);
+
+        if (categoria_seleccionada == -1) {
+            // Menú principal
+            if (opcion >= 1 && opcion <= 3) {
+                categoria_seleccionada = opcion - 1; // Entrar a categoría
+            } else if (opcion == 4) {
+                mostrar_carrito(cliente);
+            } else if (opcion == 5) {
+                break; // Salir
+            }
+        } else {
+            // Dentro de una categoría
+            if (opcion >= 1 && opcion <= categorias[categoria_seleccionada].num_productos) {
+                // Añadir al carrito
+                if (total < 30) {
+                    strcpy(carrito[total].nombre, categorias[categoria_seleccionada].productos[opcion-1].nombre);
+                    carrito[total].precio = categorias[categoria_seleccionada].productos[opcion-1].precio;
+                    total++;
+                    
+                    char respuesta[100];
+                    snprintf(respuesta, sizeof(respuesta), "Añadido: %s\n", carrito[total-1].nombre);
+                    send(cliente, respuesta, strlen(respuesta), 0);
+                } else {
+                    send(cliente, "Carrito lleno.\n", 15, 0);
+                }
+            } else if (opcion == 0) {
+                categoria_seleccionada = -1; // Volver al menú principal
+            }
+        }
+    }
+    close(cliente);
 }
 
 /**
  * Función principal del servidor
  */
 int main(int argc, char *argv[]) {
+  // Configuracion de las categorias
+  
+  //Telefonos
+    categorias[TELEFONOS].productos = samsung;
+   categorias[TELEFONOS].num_productos = sizeof(samsung) / sizeof(samsung[0]);
+
+   categorias[TELEFONOS].productos = apple;
+   categorias[TELEFONOS].num_productos = sizeof(apple) / sizeof(apple[0]);
+
+   categorias[TELEFONOS].productos = xiaomi
+   categorias[TELEFONOS].num_productos = sizeof(xiaomi) / sizeof(xiaomi[0]);
+
+   categorias[TELEFONOS].productos = huawei;
+   categorias[TELEFONOS].num_productos = sizeof(huawei) / sizeof(huawei[0]);
+
+   categorias[TELEFONOS].productos = oppo;
+   categorias[TELEFONOS].num_productos = sizeof(oppo) / sizeof(oppo[0]);
+
+   //Laptops
+   categorias[LAPTOPS].productos = lenovo;
+   categorias[LAPTOPS].num_productos = sizeof(lenovo) / sizeof(lenovo[0]);
+
+   categorias[LAPTOPS].productos = mac
+   categorias[LAPTOPS].num_productos = sizeof(mac) / sizeof(mac[0]);
+
+   categorias[LAPTOPS].productos = msi;
+   categorias[LAPTOPS].num_productos = sizeof(msi) / sizeof(msi[0]);
+
+   categorias[LAPTOPS].productos = acer;
+   categorias[LAPTOPS].num_productos = sizeof(acer) / sizeof(acer[0]);
+
+   categorias[LAPTOPS].productos = hp;
+   categorias[LAPTOPS].num_productos = sizeof(hp) / sizeof(hp[0]);
+
+   //Videojuegos
+   categorias[VIDEOJUEGOS].productos = xbox;
+   categorias[VIDEOJUEGOS].num_productos = sizeof(xbox) / sizeof(xbox[0]);
+
+   categorias[VIDEOJUEGOS].productos = playstation
+   categorias[VIDEOJUEGOS].num_productos = sizeof(playstation) / sizeof(playstation[0]);
+
+   categorias[VIDEOJUEGOS].productos = nintendo;
+   categorias[VIDEOJUEGOS].num_productos = sizeof(nintendo) / sizeof(nintendo[0]);
+
+
+
+
+   
     int mi_socket, nuevo;      // Descriptores de socket
     socklen_t tam;            // Tamaño de la estructura de dirección
     struct sockaddr_in mi_estructura;  // Estructura para la dirección del servidor
