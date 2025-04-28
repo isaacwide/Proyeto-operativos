@@ -7,11 +7,13 @@
 #include <string.h>          // Para strcpy(), strcat(), memset()
 #include <stdio.h>           // Para printf(), perror()
 
+
 // Estructura que define un producto de la tienda
 struct producto {
     char nombre[50];        // Nombre del producto (máx 50 caracteres)
     float precio;           // Precio del producto
 };
+
 
 //esto es para que aparezcan los articulos por marca
 struct Subcategoria{
@@ -19,11 +21,20 @@ struct Subcategoria{
     struct producto *productos;
     int num_productos;
 };
-enum Categoria{
+
+struct Categoria{
     char nombre[50];
     struct Subcategoria *subcategorias;
     int num_subcategorias;
 };
+
+
+/* //Estructura para agrupar productos por categoria
+struct CategoriaProductos{
+    char nombre[50];
+    struct producto *productos;
+    int num_productos;
+};*/
 
 //Organizamos los productos por marcas para la parte de "Subcategoria"
 
@@ -162,7 +173,7 @@ struct producto xbox_juegos[] = {
     {"Psychonauts 2 ", 599.00},         
     {"Ori and the Will of the Wisps", 449.00}         
 };
-struct producto playstation_juegos[] = {
+struct producto plagit add servidor.cystation_juegos[] = {
     {"Marvel's Spider-Man 2 (Edición Estándar)", 1499.00},  
     {"God of War: Ragnarok", 1299.00},                      
     {"The Last of Us Part I (Remake)", 1199.00},            
@@ -188,7 +199,11 @@ struct producto nintendo_juegos[] = {
 };
 
 
-
+/* struct CategoriaProductos categorias[]={
+    {"Telefonos", NULL, 0},
+    {"Laptops", NULL, 0},
+    {"Videojuegos", NULL, 0}
+}*/
 
 // Aqui declaramos las configuracion de categorias y subcategorias 
 struct Subcategoria subcategorias_telefonos[]={
@@ -220,6 +235,16 @@ struct Categoria categorias[]={
 };
 
 
+/*
+// Lista de productos disponibles en la tienda
+struct producto products[] = {
+    {"Zelda BOTW", 1399},   // Producto 1
+    {"Sekiro", 799},        // Producto 2
+    {"Ghost of tsushima", 999} // Producto 3
+};
+// Calcula el número de productos en el array
+const int num_products = sizeof(products)/sizeof(products[0]);
+*/
 struct producto carrito[30];
 int total_carrito = 0;
 
@@ -233,7 +258,7 @@ void enviar_menu(int sock) {
     char menu[2048] = "\n=== MENÚ DE PRODUCTOS ===\n";
     //strcat(menu, "Categorias disponibles: \n");
     // Construye el menú iterando sobre los productos
-    for (int i = 0; i < sizeof(categorias)/sizeof(categorias[0]; i++)) {
+    for (int i = 0; i < sizeof(categorias)/sizeof(categorias[0]); i++) {
         char item[100];
         // Formatea cada producto con su número, nombre y precio
         snprintf(item, sizeof(item), "%d. %s\n", i+1, categorias[i].nombre);
@@ -269,11 +294,17 @@ void enviar_productos(int sock, int categoria_id, int subcategoria_id){
         strcat(menu, item);
     }
     strcat(menu, "0. Volver\nSeleccione un producto: ");
-    send(sock, menu, strlen(menu, 0));
+    send(sock, menu, strlen(menu), 0);
 }
+
+
+
 /**
  * Función que maneja la interacción con un cliente
  * @param cliente El descriptor de socket del cliente
+ * 
+ * 
+ * 
  */
 //funcion para manejar el cliente 
  void mostrar_carrito(int sock){
@@ -282,7 +313,7 @@ void enviar_productos(int sock, int categoria_id, int subcategoria_id){
     if(total_carrito==0){
         strcat(buffer, "El carrito está vacío\n");
     }else{
-        for (int i = 0; i <= total_carrito; i++) {
+        for (int i = 0; i < total_carrito; i++) {
             char item[100];
             snprintf(item, sizeof(item), "%d. %s - $%.2f\n", 
                     i+1, carrito[i].nombre, carrito[i].precio);
@@ -294,8 +325,74 @@ void enviar_productos(int sock, int categoria_id, int subcategoria_id){
         strcat(buffer, total_msg);
 
     }
-    send(cliente, buffer, strlen(buffer), 0);
- }   
+    send(sock, buffer, strlen(buffer), 0);
+ }
+
+
+
+/*void manejar_cliente(int cliente) {
+    char buffer[1024];  // Buffer para almacenar datos recibidos
+    
+    while (1) {  // Bucle infinito hasta que el cliente elija salir
+        enviar_menu(cliente);  // Envía el menú al cliente
+
+        // Limpia el buffer antes de recibir datos
+        memset(buffer, 0, sizeof(buffer));
+        
+        // Recibe la selección del cliente
+        int recibido = recv(cliente, buffer, sizeof(buffer) - 1, 0);
+        if (recibido <= 0) break;  // Si hay error o cierre, sale del bucle
+
+        int opcion = atoi(buffer);  // Convierte la entrada a número
+        printf("Cliente %d seleccionó la opción: %d\n", cliente, opcion);//Muestra qué opción seleccionó el cliente
+        char respuesta[256];       // Buffer para la respuesta al cliente
+
+        // Procesa la opción seleccionada
+        if (opcion >= 1 && opcion <= num_products) {
+
+            if (total < 30) {
+                //copiamos el nombre del producto
+                strcpy(carrito[total].nombre, products[opcion-1].nombre);
+                carrito[total].precio = products[opcion-1].precio;
+                total++;
+                
+                snprintf(respuesta, sizeof(respuesta), 
+                       "Añadido: %s - $%.2f\n", 
+                       products[opcion-1].nombre, 
+                       products[opcion-1].precio);
+                //Muestra qué producto agregó
+                printf("Cliente %d agregó al carrito: %s\n", cliente, products[opcion - 1].nombre);
+            } else {
+                strcpy(respuesta, "Carrito lleno. No se pueden añadir más productos.\n");
+            }
+
+
+        } else if (opcion == num_products + 1) {  // opcion para ver lo que se ha guardo
+
+                //Muestra que pidió ver la canasta
+                printf("Cliente %d solicitó ver la canasta.\n", cliente);
+                mostrar_carrito(cliente);
+                continue;
+            
+            // aqui se veran los productos que se han comprado
+        } else if (opcion == num_products + 2) {
+            
+            strcpy(respuesta, "Opción inválida. Intente nuevamente.\n");
+        }else if (opcion == 5) {//el cliente se desconectó y lo muestra
+            printf("Cliente %d se desconectó.\n", cliente);
+            break;
+        }
+
+        
+
+        // Envía la respuesta al cliente
+        send(cliente, respuesta, strlen(respuesta), 0);
+    }
+
+    // Cierra el socket del cliente y termina el proceso hijo
+    close(cliente);
+    exit(0);
+} */
 
 void manejar_cliente(int cliente) {
     int estado = 0; //0=menu principal, 1=marcas, 2=los productos
@@ -360,7 +457,10 @@ void manejar_cliente(int cliente) {
  * Función principal del servidor
  */
 int main(int argc, char *argv[]) {
-    
+ 
+
+
+   
     int mi_socket, nuevo;      // Descriptores de socket
     socklen_t tam;            // Tamaño de la estructura de dirección
     struct sockaddr_in mi_estructura;  // Estructura para la dirección del servidor
@@ -422,6 +522,7 @@ int main(int argc, char *argv[]) {
             close(nuevo);
         }
     }
+
     // Cierra el socket principal (aunque en este código nunca se alcanza)
     close(mi_socket);
     return 0;
