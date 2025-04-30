@@ -6,7 +6,39 @@
 #include <stdlib.h>          // Para exit(), atoi()
 #include <string.h>          // Para strcpy(), strcat(), memset()
 #include <stdio.h>           // Para printf(), perror()
-struct producto samsung[] = {
+
+
+// Estructura que define un producto de la tienda
+struct producto {
+    char nombre[50];        // Nombre del producto (máx 50 caracteres)
+    float precio;           // Precio del producto
+};
+
+
+//esto es para que aparezcan los articulos por marca
+struct Subcategoria{
+    char nombre[50];
+    struct producto *productos;
+    int num_productos;
+};
+
+struct Categoria{
+    char nombre[50];
+    struct Subcategoria *subcategorias;
+    int num_subcategorias;
+};
+
+
+/* //Estructura para agrupar productos por categoria
+struct CategoriaProductos{
+    char nombre[50];
+    struct producto *productos;
+    int num_productos;
+};*/
+
+//Organizamos los productos por marcas para la parte de "Subcategoria"
+
+struct producto samsung_telefonos[] = {
     {"Galaxy S24 Ultra", 27999.00},
     {"Galaxy S24+", 21999.00},
     {"Galaxy S24", 17999.00},
@@ -16,10 +48,10 @@ struct producto samsung[] = {
     {"Galaxy A34 5G", 7499.00},
     {"Galaxy A14 5G", 4999.00},
     {"Galaxy M54 5G", 8499.00},
-    {"Galaxy M34 5G", 6499.00},
+    {"Galaxy M34 5G", 6499.00}
    
 };
-struct producto apple[] = {
+struct producto apple_telefonos[] = {
     {"iPhone 15 Pro Max 256GB", 34999.00},  
     {"iPhone 15 Pro 128GB", 29999.00},
     {"iPhone 15 128GB", 24999.00},
@@ -31,7 +63,7 @@ struct producto apple[] = {
     {"iPhone 11 64GB (Reacondicionado)", 8999.00},
     {"iPhone 15 Plus 256GB", 28999.00}  
 };
-struct producto xiaomi[] = {
+struct producto xiaomi_telefonos[] = {
     {"Redmi Note 13 Pro+ 5G (256GB)", 8999.00},  
     {"Redmi Note 13 Pro 5G (128GB)", 7499.00},
     {"Redmi Note 12 Pro 5G (128GB)", 6499.00},   
@@ -43,7 +75,7 @@ struct producto xiaomi[] = {
     {"Xiaomi 12 Lite 5G (128GB)", 8999.00},
     {"Redmi A3 (64GB)", 3499.00}                
 };
-struct producto huawei[] = {
+struct producto huawei_telefonos[] = {
     {"Huawei Mate 60 Pro (512GB)", 24999.00},   
     {"Huawei Mate 50 Pro (256GB)", 19999.00},   
     {"Huawei P60 Pro (256GB)", 21999.00},       
@@ -53,9 +85,9 @@ struct producto huawei[] = {
     {"Huawei Enjoy 60X (128GB)", 5499.00},      
     {"Huawei Enjoy 50z (64GB)", 4499.00},
     {"Huawei P40 Pro (128GB Reacond.)", 8999.00}, 
-    {"Huawei MatePad 11 (128GB+LTE)", 12999.00} t
+    {"Huawei MatePad 11 (128GB+LTE)", 12999.00} 
 };
-struct producto oppo[] = {
+struct producto oppo_telefonos[] = {
     {"OPPO Find X6 Pro (256GB)", 24999.00},    
     {"OPPO Find N2 Flip (256GB)", 19999.00},   
     {"OPPO Reno 10 Pro+ 5G (256GB)", 14999.00}, 
@@ -68,7 +100,7 @@ struct producto oppo[] = {
     {"OPPO A38 (64GB)", 3999.00}              
 };
 /////laptops
-struct producto lenovo[] = {
+struct producto lenovo_laptops[] = {
     {"ThinkPad X1 Carbon Gen 11 (i7, 16GB, 512GB)", 39999.00},  
     {"Legion Pro 7i (i9, RTX 4090, 32GB)", 69999.00},           
     {"Yoga Slim 7 Pro (Ryzen 7, 16GB, 1TB)", 27999.00},         
@@ -80,7 +112,7 @@ struct producto lenovo[] = {
     {"IdeaPad 5 (Ryzen 5, 12GB, 512GB)", 15999.00},            
     {"Legion Slim 5 (Ryzen 7, RTX 4070)", 38999.00}             
 };
-struct producto mac[] = {
+struct producto mac_laptops[] = {
     {"MacBook Pro 16\" M3 Max (48GB, 1TB)", 89999.00},          
     {"MacBook Air 15\" M2 (16GB, 512GB)", 34999.00},            
     {"MacBook Pro 14\" M3 Pro (36GB, 512GB)", 59999.00},        
@@ -92,7 +124,7 @@ struct producto mac[] = {
     {"MacBook Pro 14\" M2 Pro (32GB, 1TB)", 54999.00},          
     {"MacBook Air 15\" M2 (8GB, 256GB)", 31999.00}              
 };
-struct producto msi[] = {
+struct producto msi_laptops[] = {
     {"Raider GE78 (i9, RTX 4090, 64GB)", 99999.00},             
     {"Stealth 16 Studio (i7, RTX 4070)", 54999.00},           
     {"Katana 15 (i7, RTX 4060, 16GB)", 32999.00},               
@@ -104,7 +136,7 @@ struct producto msi[] = {
     {"Cyborg 15 (i7, RTX 4050)", 29499.00},                     
     {"Bravo 15 (Ryzen 5, RX 5500M)", 18999.00}                  
 };
-struct producto acer[] = {
+struct producto acer_laptops[] = {
     {"Predator Helios 16 (i9, RTX 4080)", 65999.00},            
     {"Swift X 14 (Ryzen 7, RTX 3050)", 24999.00},               
     {"Nitro 5 (i5, RTX 3050, 144Hz)", 21999.00},                
@@ -116,7 +148,7 @@ struct producto acer[] = {
     {"Swift Go 14 (i5, 16GB)", 19999.00},                       
     {"Extensa 15 (i3, 8GB)", 10999.00}                          
 };
-struct producto hp[] = {
+struct producto hp_laptops[] = {
     {"Spectre x360 16 (i7, OLED, 32GB)", 49999.00},            
     {"Omen 17 (i9, RTX 4090)", 79999.00},                       
     {"Envy 16 (i9, RTX 4060)", 54999.00},                       
@@ -129,7 +161,7 @@ struct producto hp[] = {
     {"Chromebook 14a (Pentium, 8GB)", 7499.00}                  
 };
 ////videojuegos 
-struct producto xbox[] = {
+struct producto xbox_juegos[] = {
     {"Starfield ", 1199.00},          
     {"Forza Motorsport ", 1299.00},               
     {"Halo Infinite ", 999.00},                 
@@ -141,7 +173,7 @@ struct producto xbox[] = {
     {"Psychonauts 2 ", 599.00},         
     {"Ori and the Will of the Wisps", 449.00}         
 };
-struct producto playstation[] = {
+struct producto playstation_juegos[] = {
     {"Marvel's Spider-Man 2 (Edición Estándar)", 1499.00},  
     {"God of War: Ragnarok", 1299.00},                      
     {"The Last of Us Part I (Remake)", 1199.00},            
@@ -153,7 +185,7 @@ struct producto playstation[] = {
     {"Returnal (Edición Digital)", 899.00},                 
     {"Ghost of Tsushima: Director's Cut", 1099.00}         
 };
-struct producto nintendo[] = {
+struct producto nintendo_juegos[] = {
     {"The Legend of Zelda: Tears of the Kingdom", 1499.00}, 
     {"Super Mario Bros. Wonder", 1199.00},                  
     {"Pokémon Escarlata/Violeta (DLC incluido)", 1399.00}, 
@@ -167,12 +199,43 @@ struct producto nintendo[] = {
 };
 
 
-// Estructura que define un producto de la tienda
-struct producto {
-    char nombre[50];        // Nombre del producto (máx 50 caracteres)
-    float precio;           // Precio del producto
+/* struct CategoriaProductos categorias[]={
+    {"Telefonos", NULL, 0},
+    {"Laptops", NULL, 0},
+    {"Videojuegos", NULL, 0}
+}*/
+
+// Aqui declaramos las configuracion de categorias y subcategorias 
+struct Subcategoria subcategorias_telefonos[]={
+    {"Samsung", samsung_telefonos, sizeof(samsung_telefonos)/sizeof(samsung_telefonos[0])},
+    {"Apple", apple_telefonos, sizeof(apple_telefonos)/sizeof(apple_telefonos[0])},
+    {"Xiaomi", xiaomi_telefonos, sizeof(xiaomi_telefonos)/sizeof(xiaomi_telefonos[0])},
+    {"Huawei", huawei_telefonos, sizeof(huawei_telefonos)/sizeof(huawei_telefonos[0])},
+    {"Oppo", oppo_telefonos, sizeof(oppo_telefonos)/sizeof(oppo_telefonos[0])}
 };
 
+struct Subcategoria subcategorias_laptops[]={
+    {"Lenovo", lenovo_laptops, sizeof(lenovo_laptops)/sizeof(lenovo_laptops[0])},
+    {"Mac", mac_laptops, sizeof(mac_laptops)/sizeof(mac_laptops[0])},
+    {"MSI", msi_laptops, sizeof(msi_laptops)/sizeof(msi_laptops[0])},
+    {"Acer", acer_laptops, sizeof(acer_laptops)/sizeof(acer_laptops[0])},
+    {"HP", hp_laptops, sizeof(hp_laptops)/sizeof(hp_laptops[0])}
+};
+
+struct Subcategoria subcategorias_videojuegos[]={
+    {"Xbox", xbox_juegos, sizeof(xbox_juegos)/sizeof(xbox_juegos[0])},
+    {"PlayStation", playstation_juegos, sizeof(playstation_juegos)/sizeof(playstation_juegos[0])},
+    {"Nintendo", nintendo_juegos, sizeof(nintendo_juegos)/sizeof(nintendo_juegos[0])}
+};
+
+struct Categoria categorias[]={
+    {"Teléfonos", subcategorias_telefonos, sizeof(subcategorias_telefonos)/sizeof(subcategorias_telefonos[0])},
+    {"Laptops", subcategorias_laptops, sizeof(subcategorias_laptops)/sizeof(subcategorias_laptops[0])},
+    {"VideoJuegos", subcategorias_videojuegos, sizeof(subcategorias_videojuegos)/sizeof(subcategorias_videojuegos[0])}
+};
+
+
+/*
 // Lista de productos disponibles en la tienda
 struct producto products[] = {
     {"Zelda BOTW", 1399},   // Producto 1
@@ -181,32 +244,61 @@ struct producto products[] = {
 };
 // Calcula el número de productos en el array
 const int num_products = sizeof(products)/sizeof(products[0]);
+*/
+struct producto carrito[30];
+int total_carrito = 0;
 
-struct producto carrito[30]={};
 
-int total = 0 ;
 float total_pagar=0;
 /**
  * Función que envía el menú de productos al cliente
  * @param sock El descriptor de socket del cliente conectado
  */
 void enviar_menu(int sock) {
-    char menu[1024] = "\n=== MENÚ DE PRODUCTOS ===\n";
-    
+    char menu[2048] = "\n=== MENÚ DE PRODUCTOS ===\n";
+    //strcat(menu, "Categorias disponibles: \n");
     // Construye el menú iterando sobre los productos
-    for (int i = 0; i < num_products; i++) {
+    for (int i = 0; i < sizeof(categorias)/sizeof(categorias[0]); i++) {
         char item[100];
         // Formatea cada producto con su número, nombre y precio
-        snprintf(item, sizeof(item), "%d. %s - $%.2f\n", i+1, products[i].nombre, products[i].precio);
+        snprintf(item, sizeof(item), "%d. %s\n", i+1, categorias[i].nombre);
         strcat(menu, item);  // Añade el producto al menú
     }
     // Añade la opción para salir
     strcat(menu,"4.-ver canasta \n");
-    strcat(menu, "5. Salir\nSeleccione una opción: ");
+    strcat(menu, "5. Salir\nSeleccione una categoria: ");
     
     // Envía el menú completo al cliente
     send(sock, menu, strlen(menu), 0);
 }
+
+void enviar_subcategorias(int sock, int categoria_id) {
+    char menu[2048];
+    snprintf(menu, sizeof(menu), "=== %s ===\nMarcas Disponibles:\n", categorias[categoria_id].nombre);
+    for (int i = 0; i < categorias[categoria_id].num_subcategorias; i++) { // <-- aquí corregido
+        char item[100];
+        snprintf(item, sizeof(item), "%d. %s\n", i + 1, categorias[categoria_id].subcategorias[i].nombre);
+        strcat(menu, item);
+    }
+    strcat(menu, "0. Volver\nSeleccione una marca: ");
+    send(sock, menu, strlen(menu), 0);
+}
+
+
+void enviar_productos(int sock, int categoria_id, int subcategoria_id){
+    char menu[2048];
+    struct Subcategoria sub = categorias[categoria_id].subcategorias[subcategoria_id];
+    snprintf(menu, sizeof(menu), "===%s-%s===\n", categorias[categoria_id].nombre, sub.nombre);
+    for (int i = 0; i < sub.num_productos; i++){
+        char item[100];
+        snprintf(item, sizeof(item), "%d.%s-$%.2f\n", i+1, sub.productos[i].nombre, sub.productos[i].precio);
+        strcat(menu, item);
+    }
+    strcat(menu, "0. Volver\nSeleccione un producto: ");
+    send(sock, menu, strlen(menu), 0);
+}
+
+
 
 /**
  * Función que maneja la interacción con un cliente
@@ -216,30 +308,30 @@ void enviar_menu(int sock) {
  * 
  */
 //funcion para manejar el cliente 
- void mostrar_carrito(int cliente){
-    char p[1024] ="tus productos\n";
+ void mostrar_carrito(int sock){
+    char buffer[2048] ="===TU CARRITO===\n";
     float t=0.0;
-    if(total==0){
-        strcat(p, "El carrito está vacío\n");
+    if(total_carrito==0){
+        strcat(buffer, "El carrito está vacío\n");
     }else{
-        for (int i = 0; i <= total; i++) {
+        for (int i = 0; i < total_carrito; i++) {
             char item[100];
             snprintf(item, sizeof(item), "%d. %s - $%.2f\n", 
                     i+1, carrito[i].nombre, carrito[i].precio);
-            strcat(p, item);
+            strcat(buffer, item);
             t += carrito[i].precio;
         }
-        char total_msg[50];
+        char total_msg[100];
         snprintf(total_msg, sizeof(total_msg), "\nTotal a pagar: $%.2f\n", t);
-        strcat(p, total_msg);
+        strcat(buffer, total_msg);
 
     }
-    send(cliente, p, strlen(p), 0);
+    send(sock, buffer, strlen(buffer), 0);
  }
 
 
 
-void manejar_cliente(int cliente) {
+/*void manejar_cliente(int cliente) {
     char buffer[1024];  // Buffer para almacenar datos recibidos
     
     while (1) {  // Bucle infinito hasta que el cliente elija salir
@@ -301,12 +393,122 @@ void manejar_cliente(int cliente) {
     // Cierra el socket del cliente y termina el proceso hijo
     close(cliente);
     exit(0);
+} */
+
+void manejar_cliente(int cliente) {
+    int estado = 0; // 0=menu principal, 1=marcas, 2=productos
+    int categoria_id = -1;
+    int subcategoria_id = -1;
+    char buffer[1024];
+    char respuesta[2048];
+
+    while(1) {
+        // Limpieza inicial de buffers
+        memset(buffer, 0, sizeof(buffer));
+        memset(respuesta, 0, sizeof(respuesta));
+
+        // Envío del menú correspondiente
+        if(estado == 0) {
+            enviar_menu(cliente);
+        } else if(estado == 1) {
+            enviar_subcategorias(cliente, categoria_id);
+        } else if(estado == 2) {
+            enviar_productos(cliente, categoria_id, subcategoria_id);
+        }
+
+        // Recepción de la opción
+        int bytes_recibidos = recv(cliente, buffer, sizeof(buffer), 0);
+        if (bytes_recibidos <= 0) break;
+        
+        // Limpieza y validación de entrada
+        buffer[strcspn(buffer, "\n")] = 0;
+        if(strlen(buffer) == 0) continue; // Ignorar entradas vacías
+        
+        int opcion = atoi(buffer);
+        if(opcion < 0) continue; // Validación básica
+
+        // Procesamiento de estados
+        switch(estado) {
+            case 0: // Menú principal
+                if(opcion == 5) {
+                    send(cliente, "Gracias por su visita. ¡Hasta pronto!\n", 38, 0);
+                    break; // Salir del bucle
+                }
+                else if(opcion == 4) {
+                    mostrar_carrito(cliente);
+                    continue;
+                }
+                else if(opcion >= 1 && opcion <= 3) {
+                    categoria_id = opcion - 1;
+                    estado = 1;
+                    // Reiniciar subcategoría al cambiar de categoría
+                    subcategoria_id = -1; 
+                    snprintf(respuesta, sizeof(respuesta), 
+                           "Categoría '%s' seleccionada.\n", 
+                           categorias[categoria_id].nombre);
+                    send(cliente, respuesta, strlen(respuesta), 0);
+                    continue;
+                }
+                break;
+                
+            case 1: // Subcategorías
+                if(opcion == 0) {
+                    estado = 0;
+                    categoria_id = -1; // Limpiar categoría al volver
+                    send(cliente, "Volviendo al menú principal...\n", 31, 0);
+                    continue;
+                }
+                else if(opcion > 0 && opcion <= categorias[categoria_id].num_subcategorias) {
+                    subcategoria_id = opcion - 1;
+                    estado = 2;
+                    snprintf(respuesta, sizeof(respuesta), 
+                           "Marca '%s' seleccionada.\n",
+                           categorias[categoria_id].subcategorias[subcategoria_id].nombre);
+                    send(cliente, respuesta, strlen(respuesta), 0);
+                    continue;
+                }
+                break;
+                
+            case 2: // Productos
+                if(opcion == 0) {
+                    estado = 1;
+                    subcategoria_id = -1; // Limpiar subcategoría al volver
+                    send(cliente, "Volviendo a selección de marcas...\n", 35, 0);
+                    continue;
+                }
+                else if(opcion > 0 && opcion <= categorias[categoria_id].subcategorias[subcategoria_id].num_productos) {
+                    // Lógica para añadir al carrito
+                    if(total_carrito < 30) {
+                        struct producto p = categorias[categoria_id].subcategorias[subcategoria_id].productos[opcion-1];
+                        strcpy(carrito[total_carrito].nombre, p.nombre);
+                        carrito[total_carrito].precio = p.precio;
+                        total_carrito++;
+                        snprintf(respuesta, sizeof(respuesta),
+                               "✔ Producto añadido: %s ($%.2f)\n",
+                               p.nombre, p.precio);
+                    } else {
+                        strcpy(respuesta, "❌ Carrito lleno (30/30 productos).\n");
+                    }
+                    send(cliente, respuesta, strlen(respuesta), 0);
+                    continue;
+                }
+                break;
+        }
+
+        // Opción inválida para el estado actual
+        send(cliente, "Opción no válida. Intente nuevamente.\n", 38, 0);
+    }
+    close(cliente);
 }
 
 /**
  * Función principal del servidor
  */
 int main(int argc, char *argv[]) {
+ 
+
+
+   
     int mi_socket, nuevo;      // Descriptores de socket
     socklen_t tam;            // Tamaño de la estructura de dirección
     struct sockaddr_in mi_estructura;  // Estructura para la dirección del servidor
