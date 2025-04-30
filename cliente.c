@@ -7,7 +7,12 @@
 #include <stdio.h>           // Para printf(), perror()
 #include <string.h>          // Para memset(), strlen()
 
-#define BUFFER_SIZE 2048     // Tamaño del buffer de comunicación
+#define BUFFER_SIZE 4096     // Aumentamos el tamaño para el carrito
+
+void limpiar_buffer() {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF) {}
+}
 
 int main(int argc, char *argv[]) {
     int socket_cliente;
@@ -43,32 +48,54 @@ int main(int argc, char *argv[]) {
         perror("Error al conectar con el servidor");
         exit(1);
     }
-    printf("Conexión establecida. Bienvenido a la tienda interactiva!\n");
+    printf("Conexión establecida. Bienvenido a la tienda interactiva!\n\n");
 
     // Bucle principal
     while (1) {
-        // Recibir menú
+        // Recibir menú/respuesta
         memset(buffer, 0, BUFFER_SIZE);
-        if (read(socket_cliente, buffer, BUFFER_SIZE) <= 0) break;
+        int bytes_recibidos = read(socket_cliente, buffer, BUFFER_SIZE - 1);
+        
+        if (bytes_recibidos <= 0) {
+            printf("\nEl servidor cerró la conexión\n");
+            break;
+        }
+        
+        // Mostrar lo recibido (menú, productos, etc.)
         printf("%s", buffer);
-    
-        // Enviar opción
+        
+        // Manejar salida si es el mensaje de despedida
+        if (strstr(buffer, "Gracias por su compra") != NULL) {
+            break;
+        }
+
+        // Obtener entrada del usuario
         printf("> ");
-        fgets(input, sizeof(input), stdin);
+        if (fgets(input, sizeof(input), stdin) == NULL) {
+            break; // Salir si hay error en la entrada
+        }
+        
+        // Limpiar buffer de entrada si es necesario
+        if (strchr(input, '\n') == NULL) {
+            limpiar_buffer();
+        }
+        
         input[strcspn(input, "\n")] = 0; // Eliminar salto de línea
         
-        if (send(socket_cliente, input, strlen(input), 0) <= 0) break;
-    
-        // Recibir respuesta específica (para añadir productos, etc.)
-        memset(buffer, 0, BUFFER_SIZE);
-        if (read(socket_cliente, buffer, BUFFER_SIZE) <= 0) break;
-        if (strlen(buffer) > 0) printf("%s\n", buffer);
-    
-        if (atoi(input) == 5) break; // Salir si eligió 5
+        // Enviar opción al servidor
+        if (send(socket_cliente, input, strlen(input), 0) <= 0) {
+            perror("Error al enviar datos");
+            break;
+        }
+
+        // Si el usuario eligió salir (opción 5 en menú principal)
+        if (atoi(input) == 5) {
+            break;
+        }
     }
 
     // Cierre
     close(socket_cliente);
-    printf("Conexión cerrada. Hasta pronto!\n");
+    printf("\nConexión cerrada. Hasta pronto!\n");
     return 0;
 }

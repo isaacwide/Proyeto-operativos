@@ -14,7 +14,6 @@ struct producto {
     float precio;           // Precio del producto
 };
 
-
 //esto es para que aparezcan los articulos por marca
 struct Subcategoria{
     char nombre[50];
@@ -27,14 +26,6 @@ struct Categoria{
     struct Subcategoria *subcategorias;
     int num_subcategorias;
 };
-
-
-/* //Estructura para agrupar productos por categoria
-struct CategoriaProductos{
-    char nombre[50];
-    struct producto *productos;
-    int num_productos;
-};*/
 
 //Organizamos los productos por marcas para la parte de "Subcategoria"
 
@@ -198,13 +189,6 @@ struct producto nintendo_juegos[] = {
     {"Luigi's Mansion 3", 999.00}                           
 };
 
-
-/* struct CategoriaProductos categorias[]={
-    {"Telefonos", NULL, 0},
-    {"Laptops", NULL, 0},
-    {"Videojuegos", NULL, 0}
-}*/
-
 // Aqui declaramos las configuracion de categorias y subcategorias 
 struct Subcategoria subcategorias_telefonos[]={
     {"Samsung", samsung_telefonos, sizeof(samsung_telefonos)/sizeof(samsung_telefonos[0])},
@@ -235,16 +219,6 @@ struct Categoria categorias[]={
 };
 
 
-/*
-// Lista de productos disponibles en la tienda
-struct producto products[] = {
-    {"Zelda BOTW", 1399},   // Producto 1
-    {"Sekiro", 799},        // Producto 2
-    {"Ghost of tsushima", 999} // Producto 3
-};
-// Calcula el número de productos en el array
-const int num_products = sizeof(products)/sizeof(products[0]);
-*/
 struct producto carrito[30];
 int total_carrito = 0;
 
@@ -267,6 +241,7 @@ void enviar_menu(int sock) {
     // Añade la opción para salir
     strcat(menu,"4.-ver canasta \n");
     strcat(menu, "5. Salir\nSeleccione una categoria: ");
+    
     
     // Envía el menú completo al cliente
     send(sock, menu, strlen(menu), 0);
@@ -301,15 +276,6 @@ void enviar_productos(int sock, int categoria_id, int subcategoria_id){
     send(sock, menu, strlen(menu), 0);
 }
 
-
-
-/**
- * Función que maneja la interacción con un cliente
- * @param cliente El descriptor de socket del cliente
- * 
- * 
- * 
- */
 //funcion para manejar el cliente 
 void mostrar_carrito(int sock) {
     char buffer[4096] = "=== TU CARRITO ===\n";
@@ -333,12 +299,71 @@ void mostrar_carrito(int sock) {
         strcat(buffer, total_msg);
     }
     
-    strcat(buffer, "\n0. Volver\n> ");
+    strcat(buffer, "\n0. Volver\n1. Pagar\n2. Vaciar carrito\n> ");
     send(sock, buffer, strlen(buffer), 0);
 }
 
+void mostrar_metodos_pago(int sock) {
+    char menu[512] = "\n=== MÉTODO DE PAGO ===\n";
+    strcat(menu, "1. Tarjeta de crédito\n");
+    strcat(menu, "2. Efectivo\n");
+    strcat(menu, "3. Pago mensual\n");
+    strcat(menu, "Seleccione una opción: ");
+    send(sock, menu, strlen(menu), 0);
+}
+void procesar_pago(int sock) {
+    if(total_carrito == 0) {
+        send(sock, "❌ No hay productos en el carrito para pagar\n", 45, 0);
+        return;
+    }
+    // Calcular total
+    total_pagar = 0.0;
+    for(int i = 0; i < total_carrito; i++) {
+        total_pagar += carrito[i].precio;
+    }
+    mostrar_metodos_pago(sock); 
+}
+
+
+void credito(int sock){
+    char text[2048]="INGRESE SU NUMERO DE TARGETA Y SU NIP";
+
+}
+
+void efectivo(int sock){
+    char ticket[2048] = "=== TICKET DE COMPRA ===\n";
+    for(int i = 0; i < total_carrito; i++) {
+        char item[100];
+        snprintf(item, sizeof(item), "%-40s $%9.2f\n", carrito[i].nombre, carrito[i].precio);
+        strcat(ticket, item);
+    }
+
+    char total_msg[100];
+    snprintf(total_msg, sizeof(total_msg),"\nTOTAL: $%.2f\n\n¡Gracias por su compra!\n", total_pagar);
+    strcat(ticket, total_msg);
+
+    int clave= 100000 + rand() % 900000;;
+    char mesage[200];
+
+    snprintf(mesage,sizeof(mesage),"\nEscane este codigo\n(%d)\n En la tienda de su preferencia\n",clave);
+    strcat(ticket,mesage);
+
+    send(sock, ticket, strlen(ticket), 0);
+
+    total_carrito=0;
+
+}
+void pagomes(int sock){
+
+}
+/**
+ * Función que maneja la interacción con un cliente
+ * @param cliente El descriptor de socket del cliente
+ * 
+ */
+
 void manejar_cliente(int cliente) {
-    int estado = 0; // 0=menu principal, 1=marcas, 2=productos
+    int estado = 0; // 0=menu principal, 1=marcas, 2=productos 3== estado del carrito 
     int categoria_id = -1;
     int subcategoria_id = -1;
     char buffer[1024];
@@ -400,6 +425,7 @@ void manejar_cliente(int cliente) {
                     return;
                 }
                 else if(opcion == 4) {
+                    estado = 3; 
                     mostrar_carrito(cliente);
                     continue;
                 }
@@ -457,6 +483,43 @@ void manejar_cliente(int cliente) {
                     continue;
                 }
                 break;
+            case 3:
+                if(opcion == 0) {
+                    estado = 0;
+                    send(cliente, "Volviendo al menú principal...\n", 31, 0);
+                }
+                else if(opcion == 1) {
+                    procesar_pago(cliente);
+                    estado = 4;
+                }
+                else if(opcion == 2) {
+                    total_carrito = 0;
+                    send(cliente, "🔄 Carrito vaciado correctamente\n", 34, 0);
+                    estado = 0;
+                }
+                break;
+            case 4:
+                  switch (opcion)
+                  {
+                  case 1:
+                    credito(cliente);
+                    estado=0;
+                    break;
+                  case 2:
+                    efectivo(cliente);
+                    estado=0;
+                    break;
+                  case 3:
+                    pagomes(cliente);
+                    estado=0;
+                    break;
+                  default:
+                    send(cliente, "Opción no válida\n", 18, 0);
+                    mostrar_metodos_pago(cliente); // Mostrar menú de nuevo
+                    break;
+                  }
+                  
+                break;
         }
 
         // Opción inválida
@@ -467,16 +530,11 @@ void manejar_cliente(int cliente) {
     close(cliente);
     printf("Conexión con cliente %d cerrada\n", cliente);
 }
-
-
 /**
  * Función principal del servidor
  */
 int main(int argc, char *argv[]) {
- 
-
-
-   
+    
     int mi_socket, nuevo;      // Descriptores de socket
     socklen_t tam;            // Tamaño de la estructura de dirección
     struct sockaddr_in mi_estructura;  // Estructura para la dirección del servidor
