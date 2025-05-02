@@ -6,6 +6,7 @@
 #include <stdlib.h>          // Para exit(), atoi()
 #include <string.h>          // Para strcpy(), strcat(), memset()
 #include <stdio.h>           // Para printf(), perror()
+#include <time.h> 
 
 
 // Estructura que define un producto de la tienda
@@ -326,11 +327,87 @@ void procesar_pago(int sock) {
 
 
 void credito(int sock){
-    char text[2048]="INGRESE SU NUMERO DE TARGETA Y SU NIP";
+    char mensaje[2048] = "\n=== SECCIÓN DE PAGO CON TARJETA DE CRÉDITO ===\n";
+    char buffer[100];
+    char tarjeta[20] = {0};
+    char fecha[6] = {0};
+    char cvv[4] = {0};
+    
+    // Solicitar número de tarjeta
+    strcat(mensaje, "Por favor ingrese los siguientes datos:\n");
+    strcat(mensaje, "Número de tarjeta (XXXX-XXXX-XXXX-XXXX): ");
+    send(sock, mensaje, strlen(mensaje), 0);
+    
+    // Recibir número de tarjeta
+    memset(buffer, 0, sizeof(buffer));
+    recv(sock, buffer, sizeof(buffer), 0);
+    if(strchr(buffer, '\n')) *strchr(buffer, '\n') = '\0';
+    strncpy(tarjeta, buffer, 19);
+    
+    // Solicitar fecha de expiración
+    memset(mensaje, 0, sizeof(mensaje));
+    strcpy(mensaje, "Fecha de expiración (MM/AA): ");
+    send(sock, mensaje, strlen(mensaje), 0);
+    
+    // Recibir fecha
+    memset(buffer, 0, sizeof(buffer));
+    recv(sock, buffer, sizeof(buffer), 0);
+    if(strchr(buffer, '\n')) *strchr(buffer, '\n') = '\0';
+    strncpy(fecha, buffer, 5);
+    
+    // Solicitar CVV
+    memset(mensaje, 0, sizeof(mensaje));
+    strcpy(mensaje, "Código de seguridad (XXX): ");
+    send(sock, mensaje, strlen(mensaje), 0);
+    
+    // Recibir CVV
+    memset(buffer, 0, sizeof(buffer));
+    recv(sock, buffer, sizeof(buffer), 0);
+    if(strchr(buffer, '\n')) *strchr(buffer, '\n') = '\0';
+    strncpy(cvv, buffer, 3);
+    
+    // Procesar el pago (simulación)
+    memset(mensaje, 0, sizeof(mensaje));
+    strcpy(mensaje, "\nProcesando pago con los siguientes datos:\n");
+    char info[200];
+    snprintf(info, sizeof(info), "Tarjeta: %s\nExpiración: %s\nCVV: %s\n\n", 
+             tarjeta, fecha, cvv);
+    strcat(mensaje, info);
+    strcat(mensaje, "Procesando transacción...\n");
+    send(sock, mensaje, strlen(mensaje), 0);
+    
+    // Simular procesamiento
+    sleep(2);
+    
+    // Generar ticket
+    memset(mensaje, 0, sizeof(mensaje));
+    strcpy(mensaje, "✅ Pago aprobado!\n\n=== TICKET DE COMPRA ===\n");
+    for (int i = 0; i < total_carrito; i++) {
+        char item[100];
+        snprintf(item, sizeof(item), "%-40s $%9.2f\n", carrito[i].nombre, carrito[i].precio);
+        strcat(mensaje, item);
+    }
+    
+    char total_msg[100];
+    snprintf(total_msg, sizeof(total_msg), "\nTOTAL: $%.2f\n\n¡Gracias por su compra!\n", total_pagar);
+    strcat(mensaje, total_msg);
+    strcat(mensaje, "\nPresione ENTER para continuar...");
+    
+    send(sock, mensaje, strlen(mensaje), 0);
+    
+    // Vaciar carrito
+    total_carrito = 0;
+    
+    // Esperar ENTER para continuar
+    memset(buffer, 0, sizeof(buffer));
+    recv(sock, buffer, sizeof(buffer), 0);
 
 }
 
 void efectivo(int sock){
+    
+    srand(time(NULL));
+
     char ticket[2048] = "=== TICKET DE COMPRA ===\n";
     for(int i = 0; i < total_carrito; i++) {
         char item[100];
@@ -345,15 +422,136 @@ void efectivo(int sock){
     int clave= 100000 + rand() % 900000;;
     char mesage[200];
 
-    snprintf(mesage,sizeof(mesage),"\nEscane este codigo\n(%d)\n En la tienda de su preferencia\n",clave);
+    snprintf(mesage,sizeof(mesage),"\nEscane este codigo\n[%d]\n En la tienda de su preferencia\n",clave);
     strcat(ticket,mesage);
 
     send(sock, ticket, strlen(ticket), 0);
 
     total_carrito=0;
 
+    char buffer[10];
+    recv(sock, buffer, sizeof(buffer), 0);
+
 }
 void pagomes(int sock){
+
+    char mensaje[2048] = "\n=== PAGO MENSUAL ===\n";
+    char buffer[100];
+    int meses = 12; // Valor predeterminado
+    
+    // Solicitar cantidad de meses
+    strcat(mensaje, "¿En cuántos meses desea dividir su pago? (3, 6, 9 o 12): ");
+    send(sock, mensaje, strlen(mensaje), 0);
+    
+    // Recibir cantidad de meses
+    memset(buffer, 0, sizeof(buffer));
+    recv(sock, buffer, sizeof(buffer), 0);
+    if(strchr(buffer, '\n')) *strchr(buffer, '\n') = '\0';
+    
+    int opcion_meses = atoi(buffer);
+    
+    // Validar y asignar meses
+    switch(opcion_meses) {
+        case 3:
+        case 6:
+        case 9:
+        case 12:
+            meses = opcion_meses;
+            break;
+        default:
+            meses = 12; // Valor predeterminado
+            break;
+    }
+    
+    // Calcular pago mensual
+    float pago_mensual = total_pagar / (float)meses;
+    
+    // Solicitar datos de tarjeta para el plan
+    memset(mensaje, 0, sizeof(mensaje));
+    sprintf(mensaje, "Su compra será dividida en %d pagos mensuales sin intereses.\n\n", meses);
+    char detalle[200];
+    snprintf(detalle, sizeof(detalle), "Total de la compra: $%.2f\n", total_pagar);
+    strcat(mensaje, detalle);
+    snprintf(detalle, sizeof(detalle), "Pago mensual: $%.2f x %d meses\n\n", pago_mensual, meses);
+    strcat(mensaje, detalle);
+    
+    strcat(mensaje, "Por favor ingrese los datos de su tarjeta para configurar el plan.\n");
+    strcat(mensaje, "Número de tarjeta (XXXX-XXXX-XXXX-XXXX): ");
+    send(sock, mensaje, strlen(mensaje), 0);
+    
+    // Recibir datos de tarjeta (similar a la función credito)
+    char tarjeta[20] = {0};
+    memset(buffer, 0, sizeof(buffer));
+    recv(sock, buffer, sizeof(buffer), 0);
+    if(strchr(buffer, '\n')) *strchr(buffer, '\n') = '\0';
+    strncpy(tarjeta, buffer, 19);
+    
+    // Solicitar correo electrónico para notificaciones
+    memset(mensaje, 0, sizeof(mensaje));
+    strcpy(mensaje, "Correo electrónico para recibir notificaciones de pago: ");
+    send(sock, mensaje, strlen(mensaje), 0);
+    
+    char correo[50] = {0};
+    memset(buffer, 0, sizeof(buffer));
+    recv(sock, buffer, sizeof(buffer), 0);
+    if(strchr(buffer, '\n')) *strchr(buffer, '\n') = '\0';
+    strncpy(correo, buffer, 49);
+    
+    // Procesar el plan de pagos (simulación)
+    memset(mensaje, 0, sizeof(mensaje));
+    strcpy(mensaje, "\nProcesando plan de pagos con los siguientes datos:\n");
+    snprintf(detalle, sizeof(detalle), "Tarjeta: %s\nCorreo: %s\nPlan: %d meses\n\n", 
+             tarjeta, correo, meses);
+    strcat(mensaje, detalle);
+    strcat(mensaje, "Configurando plan de pagos...\n");
+    send(sock, mensaje, strlen(mensaje), 0);
+    
+    // Simular procesamiento
+    sleep(2);
+    
+    // Generar ticket
+    memset(mensaje, 0, sizeof(mensaje));
+    strcpy(mensaje, "✅ Plan de pagos aprobado!\n\n=== RESUMEN DE COMPRA ===\n");
+    for(int i = 0; i < total_carrito; i++) {
+        char item[100];
+        snprintf(item, sizeof(item), "%-40s $%9.2f\n", carrito[i].nombre, carrito[i].precio);
+        strcat(mensaje, item);
+    }
+    
+    char total_msg[200];
+    snprintf(total_msg, sizeof(total_msg), 
+             "\nTOTAL: $%.2f\nPAGO MENSUAL: $%.2f x %d meses\n\n¡Gracias por su compra!\n", 
+             total_pagar, pago_mensual, meses);
+    strcat(mensaje, total_msg);
+    
+    // Calendario de pagos
+    strcat(mensaje, "\n=== CALENDARIO DE PAGOS ===\n");
+    time_t t = time(NULL);
+    struct tm *tm_info = localtime(&t);
+    
+    for(int i = 1; i <= meses; i++) {
+        // Avanzar un mes
+        tm_info->tm_mon += 1;
+        if(tm_info->tm_mon > 11) {
+            tm_info->tm_mon = 0;
+            tm_info->tm_year += 1;
+        }
+        
+        char fecha[50];
+        snprintf(fecha, sizeof(fecha), "Pago %d: %.2d/%.2d/%d - $%.2f\n", 
+                 i, tm_info->tm_mon + 1, tm_info->tm_mday, 1900 + tm_info->tm_year, pago_mensual);
+        strcat(mensaje, fecha);
+    }
+    
+    strcat(mensaje, "\nPresione ENTER para continuar...");
+    send(sock, mensaje, strlen(mensaje), 0);
+    
+    // Vaciar carrito
+    total_carrito = 0;
+    
+    // Esperar ENTER para continuar
+    memset(buffer, 0, sizeof(buffer));
+    recv(sock, buffer, sizeof(buffer), 0);
 
 }
 /**
@@ -363,107 +561,106 @@ void pagomes(int sock){
  */
 
 void manejar_cliente(int cliente) {
-    int estado = 0; // 0=menu principal, 1=marcas, 2=productos 3== estado del carrito 
+    int estado = 0; // 0=menu principal, 1=marcas, 2=productos 3=estado del carrito, 4=método de pago 
     int categoria_id = -1;
     int subcategoria_id = -1;
     char buffer[1024];
     char respuesta[2048];
+
+    // Enviar menú principal inicialmente
+    enviar_menu(cliente);
 
     while(1) {
         // Limpieza exhaustiva de buffers
         memset(buffer, 0, sizeof(buffer));
         memset(respuesta, 0, sizeof(respuesta));
 
-        // Envío del menú correspondiente
-        if(estado == 0) {
-            enviar_menu(cliente);
-        } else if(estado == 1) {
-            enviar_subcategorias(cliente, categoria_id);
-        } else if(estado == 2) {
-            enviar_productos(cliente, categoria_id, subcategoria_id);
-        }
-
-        // Configuración de timeout para recepción
-        fd_set set;
-        struct timeval timeout;
-        FD_ZERO(&set);
-        FD_SET(cliente, &set);
-        timeout.tv_sec = 30; // Timeout de 30 segundos
-        timeout.tv_usec = 0;
-
-        int rv = select(cliente + 1, &set, NULL, NULL, &timeout);
-        if(rv == -1) {
-            perror("Error en select");
-            break;
-        } else if(rv == 0) {
-            printf("Timeout con cliente %d\n", cliente);
-            send(cliente, "⏳ Tiempo de inactividad excedido\n", 34, 0);
-            break;
-        }
-
-        // Recepción de datos
+        // Recepción de datos con manejo mejorado de errores
         int bytes_recibidos = recv(cliente, buffer, sizeof(buffer) - 1, 0);
         if(bytes_recibidos <= 0) {
-            printf("Cliente %d desconectado\n", cliente);
+            printf("Cliente %d desconectado o error de recepción\n", cliente);
             break;
         }
 
-        // Procesamiento de entrada
+        // Procesamiento de entrada con mejor validación
         buffer[bytes_recibidos] = '\0';
-        char *newline = strchr(buffer, '\n');
-        if(newline) *newline = '\0';
-        if(strlen(buffer) == 0) continue;
-
-        int opcion = atoi(buffer);
+        if(strchr(buffer, '\n')) *strchr(buffer, '\n') = '\0';
         
-        // Máquina de estados principal
+        // Tratamiento especial para mensajes de sincronización
+        if(strcmp(buffer, "<SYNC_ACK>") == 0) {
+            continue; // Ignorar mensajes de sincronización
+        }
+        
+        int opcion = atoi(buffer);
+        printf("Estado: %d, Opción recibida: %d\n", estado, opcion); // Para depuración
+        
+        // Procesamiento según el estado actual con mejor manejo de errores
         switch(estado) {
             case 0: // Menú principal
                 if(opcion == 5) {
-                    send(cliente, "🚪 Sesión finalizada. ¡Gracias por su compra!\n", 45, 0);
+                    send(cliente, "🚪 Sesión finalizada. ¡Gracias por su visita!\n", 45, 0);
                     close(cliente);
                     return;
                 }
                 else if(opcion == 4) {
-                    estado = 3; 
+                    estado = 3; // Ir al carrito
                     mostrar_carrito(cliente);
-                    continue;
                 }
                 else if(opcion >= 1 && opcion <= 3) {
                     categoria_id = opcion - 1;
-                    estado = 1;
+                    estado = 1; // Ir a subcategorías
                     snprintf(respuesta, sizeof(respuesta),
                            "📱 Categoría '%s' seleccionada\n",
                            categorias[categoria_id].nombre);
                     send(cliente, respuesta, strlen(respuesta), 0);
-                    continue;
+                    
+                    // Pequeña pausa para asegurar que el cliente reciba correctamente
+                    usleep(100000); // 100ms
+                    
+                    enviar_subcategorias(cliente, categoria_id);
+                }
+                else {
+                    send(cliente, "⚠ Opción no válida. Intente nuevamente.\n", 42, 0);
+                    // Pequeña pausa para asegurar recepción correcta
+                    usleep(100000);
+                    enviar_menu(cliente);
                 }
                 break;
                 
             case 1: // Subcategorías (marcas)
                 if(opcion == 0) {
-                    estado = 0;
+                    estado = 0; // Volver al menú principal
                     categoria_id = -1;
                     send(cliente, "↩ Volviendo al menú principal...\n", 32, 0);
-                    continue;
+                    // Asegurar que el cliente reciba el mensaje antes del menú
+                    usleep(200000); // 200ms
+                    enviar_menu(cliente);
                 }
                 else if(opcion >= 1 && opcion <= categorias[categoria_id].num_subcategorias) {
                     subcategoria_id = opcion - 1;
-                    estado = 2;
+                    estado = 2; // Ir a productos
                     snprintf(respuesta, sizeof(respuesta),
                            "🛍️ Mostrando productos de %s - %s\n",
                            categorias[categoria_id].nombre,
                            categorias[categoria_id].subcategorias[subcategoria_id].nombre);
                     send(cliente, respuesta, strlen(respuesta), 0);
-                    continue;
+                    // Pequeña pausa
+                    usleep(100000);
+                    enviar_productos(cliente, categoria_id, subcategoria_id);
+                }
+                else {
+                    send(cliente, "⚠ Opción no válida. Intente nuevamente.\n", 42, 0);
+                    usleep(100000);
+                    enviar_subcategorias(cliente, categoria_id);
                 }
                 break;
                 
             case 2: // Productos
                 if(opcion == 0) {
-                    estado = 1;
+                    estado = 1; // Volver a selección de marcas
                     send(cliente, "↩ Volviendo a selección de marcas...\n", 36, 0);
-                    continue;
+                    usleep(100000); // Pequeña pausa
+                    enviar_subcategorias(cliente, categoria_id);
                 }
                 else if(opcion >= 1 && opcion <= categorias[categoria_id].subcategorias[subcategoria_id].num_productos) {
                     // Añadir al carrito
@@ -472,58 +669,103 @@ void manejar_cliente(int cliente) {
                         strcpy(carrito[total_carrito].nombre, p.nombre);
                         carrito[total_carrito].precio = p.precio;
                         total_carrito++;
+                        
+                        // Informar al usuario
                         snprintf(respuesta, sizeof(respuesta),
-                               "✅ Añadido: %s ($%.2f)\n",
+                               "✅ Añadido: %s ($%.2f)\n\n¿Qué desea hacer ahora?\n1. Seguir comprando\n2. Ver carrito\n3. Menú principal\nSeleccione una opción: ",
                                p.nombre, p.precio);
+                        send(cliente, respuesta, strlen(respuesta), 0);
+                        
+                        // Esperar respuesta para la navegación
+                        memset(buffer, 0, sizeof(buffer));
+                        bytes_recibidos = recv(cliente, buffer, sizeof(buffer) - 1, 0);
+                        if(bytes_recibidos <= 0) break;
+                        buffer[bytes_recibidos] = '\0';
+                        if(strchr(buffer, '\n')) *strchr(buffer, '\n') = '\0';
+                        
+                        int nav_opcion = atoi(buffer);
+                        if(nav_opcion == 2) {
+                            estado = 3; // Ver carrito
+                            mostrar_carrito(cliente);
+                        }
+                        else if(nav_opcion == 3) {
+                            estado = 0; // Menú principal
+                            enviar_menu(cliente);
+                        }
+                        else {
+                            // Seguir comprando (por defecto)
+                            enviar_productos(cliente, categoria_id, subcategoria_id);
+                        }
                     } else {
-                        snprintf(respuesta, sizeof(respuesta),
-                               "❌ Carrito lleno (30/30 productos)\n");
+                        send(cliente, "❌ Carrito lleno (30/30 productos)\n", 34, 0);
+                        usleep(100000);
+                        enviar_productos(cliente, categoria_id, subcategoria_id);
                     }
-                    send(cliente, respuesta, strlen(respuesta), 0);
-                    continue;
+                }
+                else {
+                    send(cliente, "⚠ Opción no válida. Intente nuevamente.\n", 42, 0);
+                    usleep(100000);
+                    enviar_productos(cliente, categoria_id, subcategoria_id);
                 }
                 break;
-            case 3:
+                
+            case 3: // Carrito
                 if(opcion == 0) {
-                    estado = 0;
+                    estado = 0; // Volver al menú principal
                     send(cliente, "Volviendo al menú principal...\n", 31, 0);
+                    usleep(100000);
+                    enviar_menu(cliente);
                 }
                 else if(opcion == 1) {
-                    procesar_pago(cliente);
-                    estado = 4;
+                    if(total_carrito > 0) {
+                        procesar_pago(cliente);
+                        estado = 4; // Ir a métodos de pago
+                    } else {
+                        send(cliente, "❌ No hay productos en el carrito para pagar\n", 45, 0);
+                        usleep(100000);
+                        mostrar_carrito(cliente);
+                    }
                 }
                 else if(opcion == 2) {
                     total_carrito = 0;
                     send(cliente, "🔄 Carrito vaciado correctamente\n", 34, 0);
-                    estado = 0;
+                    estado = 0; // Volver al menú principal
+                    usleep(100000);
+                    enviar_menu(cliente);
+                }
+                else {
+                    send(cliente, "⚠ Opción no válida. Intente nuevamente.\n", 42, 0);
+                    usleep(100000);
+                    mostrar_carrito(cliente);
                 }
                 break;
-            case 4:
-                  switch (opcion)
-                  {
-                  case 1:
+                
+            case 4: // Métodos de pago
+                if(opcion == 1) {
                     credito(cliente);
-                    estado=0;
-                    break;
-                  case 2:
+                    estado = 0; // Volver al menú principal
+                    usleep(200000); // Pausa más larga después del proceso de pago
+                    enviar_menu(cliente);
+                }
+                else if(opcion == 2) {
                     efectivo(cliente);
-                    estado=0;
-                    break;
-                  case 3:
+                    estado = 0; // Volver al menú principal
+                    usleep(200000);
+                    enviar_menu(cliente);
+                }
+                else if(opcion == 3) {
                     pagomes(cliente);
-                    estado=0;
-                    break;
-                  default:
-                    send(cliente, "Opción no válida\n", 18, 0);
-                    mostrar_metodos_pago(cliente); // Mostrar menú de nuevo
-                    break;
-                  }
-                  
+                    estado = 0; // Volver al menú principal
+                    usleep(200000);
+                    enviar_menu(cliente);
+                }
+                else {
+                    send(cliente, "⚠ Opción no válida. Intente nuevamente.\n", 42, 0);
+                    usleep(100000);
+                    mostrar_metodos_pago(cliente);
+                }
                 break;
         }
-
-        // Opción inválida
-        send(cliente, "⚠ Opción no válida. Intente nuevamente.\n", 42, 0);
     }
     
     // Limpieza final
@@ -535,6 +777,7 @@ void manejar_cliente(int cliente) {
  */
 int main(int argc, char *argv[]) {
     
+    srand(time(NULL));
     int mi_socket, nuevo;      // Descriptores de socket
     socklen_t tam;            // Tamaño de la estructura de dirección
     struct sockaddr_in mi_estructura;  // Estructura para la dirección del servidor
