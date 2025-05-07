@@ -7,6 +7,7 @@
 #include <string.h>          // Para strcpy(), strcat(), memset()
 #include <stdio.h>           // Para printf(), perror()
 #include <time.h> 
+#include <ctype.h>
 
 
 // Estructura que define un producto de la tienda
@@ -225,13 +226,39 @@ int total_carrito = 0;
 
 
 float total_pagar=0;
+
+/**
+ * Función mejorada para enviar mensajes completos
+ * Garantiza que todo el mensaje sea enviado, incluso si es largo
+ */
+int enviar_mensaje(int sock, const char *mensaje) {
+    int total = 0;
+    int longitud = strlen(mensaje);
+    int restante = longitud;
+    int n;
+    
+    // Enviar el mensaje en bloques si es necesario
+    while(total < longitud) {
+        n = send(sock, mensaje + total, restante, 0);
+        
+        if (n == -1) {
+            break;
+        }
+        
+        total += n;
+        restante -= n;
+    }
+    
+    return (n == -1 ? -1 : total);
+}
+
 /**
  * Función que envía el menú de productos al cliente
  * @param sock El descriptor de socket del cliente conectado
  */
 void enviar_menu(int sock) {
-    char menu[2048] = "\n=== MENÚ DE PRODUCTOS ===\n";
-    //strcat(menu, "Categorias disponibles: \n");
+    char menu[2048] = "\n\n=== MENÚ DE PRODUCTOS ===\n\n";
+    
     // Construye el menú iterando sobre los productos
     for (int i = 0; i < sizeof(categorias)/sizeof(categorias[0]); i++) {
         char item[100];
@@ -239,13 +266,14 @@ void enviar_menu(int sock) {
         snprintf(item, sizeof(item), "%d. %s\n", i+1, categorias[i].nombre);
         strcat(menu, item);  // Añade el producto al menú
     }
+    
     // Añade la opción para salir
-    strcat(menu,"4.-ver canasta \n");
-    strcat(menu, "5. Salir\nSeleccione una categoria: ");
+    strcat(menu, "4. Ver canasta\n");
+    strcat(menu, "5. Salir\n\n");
+    strcat(menu, "Seleccione una categoria (1-5): ");
     
-    
-    // Envía el menú completo al cliente
-    send(sock, menu, strlen(menu), 0);
+    // Envía el menú completo al cliente usando la nueva función
+    enviar_mensaje(sock, menu);
 }
 
 void enviar_subcategorias(int sock, int categoria_id) {
@@ -260,8 +288,14 @@ void enviar_subcategorias(int sock, int categoria_id) {
     }
     
     // Opción para volver siempre como 0
-    strcat(menu, "0. Volver al menú principal\nSeleccione una marca: ");
-    send(sock, menu, strlen(menu), 0);
+    strcat(menu, "\n0. Volver al menú principal\n\n");
+    strcat(menu, "Seleccione una marca (0-");
+    char rango[10];
+    snprintf(rango, sizeof(rango), "%d", categorias[categoria_id].num_subcategorias);
+    strcat(menu, rango);
+    strcat(menu, "): ");
+    
+    enviar_mensaje(sock, menu);
 }
 
 void enviar_productos(int sock, int categoria_id, int subcategoria_id){
@@ -273,8 +307,14 @@ void enviar_productos(int sock, int categoria_id, int subcategoria_id){
         snprintf(item, sizeof(item), "%d.%s-$%.2f\n", i+1, sub.productos[i].nombre, sub.productos[i].precio);
         strcat(menu, item);
     }
-    strcat(menu, "0. Volver\nSeleccione un producto: ");
-    send(sock, menu, strlen(menu), 0);
+    strcat(menu, "\n0. Volver\n\n");
+    strcat(menu, "Seleccione un producto (0-");
+    char rango[10];
+    snprintf(rango, sizeof(rango), "%d", sub.num_productos);
+    strcat(menu, rango);
+    strcat(menu, "): ");
+    
+    enviar_mensaje(sock, menu);
 }
 
 //funcion para manejar el cliente 
@@ -300,8 +340,10 @@ void mostrar_carrito(int sock) {
         strcat(buffer, total_msg);
     }
     
-    strcat(buffer, "\n0. Volver\n1. Pagar\n2. Vaciar carrito\n> ");
-    send(sock, buffer, strlen(buffer), 0);
+    strcat(buffer, "\n0. Volver\n1. Pagar\n2. Vaciar carrito\n\n");
+    strcat(buffer, "Seleccione una opción (0-2): ");
+    
+    enviar_mensaje(sock, buffer);
 }
 
 void mostrar_metodos_pago(int sock) {
@@ -310,7 +352,8 @@ void mostrar_metodos_pago(int sock) {
     strcat(menu, "2. Efectivo\n");
     strcat(menu, "3. Pago mensual\n");
     strcat(menu, "Seleccione una opción: ");
-    send(sock, menu, strlen(menu), 0);
+    
+    enviar_mensaje(sock, menu);
 }
 void procesar_pago(int sock) {
     if(total_carrito == 0) {
@@ -586,19 +629,51 @@ void manejar_cliente(int cliente) {
         buffer[bytes_recibidos] = '\0';
         if(strchr(buffer, '\n')) *strchr(buffer, '\n') = '\0';
         
+        // Depuración para ver exactamente qué se recibió
+        printf("Recibido del cliente: '%s'\n", buffer);
+        
         // Tratamiento especial para mensajes de sincronización
         if(strcmp(buffer, "<SYNC_ACK>") == 0) {
             continue; // Ignorar mensajes de sincronización
         }
         
-        int opcion = atoi(buffer);
-        printf("Estado: %d, Opción recibida: %d\n", estado, opcion); // Para depuración
+        // Validar que la entrada sea un número antes de convertirla
+        int opcion = 0;
+        if(strlen(buffer) > 0) {
+            // Verificar que la entrada sea un número
+            int es_numero = 1;
+            for(int i = 0; i < strlen(buffer); i++) {
+                if(!isdigit(buffer[i])) {
+                    es_numero = 0;
+                    break;
+                }
+            }
+            
+            if(es_numero) {
+                opcion = atoi(buffer);
+            } else {
+                // Si no es un número, enviar mensaje de error
+                enviar_mensaje(cliente, "⚠ Por favor ingrese un número válido.\n");
+                
+                // Reenviar el menú apropiado según el estado actual
+                switch(estado) {
+                    case 0: enviar_menu(cliente); break;
+                    case 1: enviar_subcategorias(cliente, categoria_id); break;
+                    case 2: enviar_productos(cliente, categoria_id, subcategoria_id); break;
+                    case 3: mostrar_carrito(cliente); break;
+                    case 4: mostrar_metodos_pago(cliente); break;
+                }
+                continue; // Continuar al siguiente ciclo
+            }
+        }
+        
+        printf("Estado: %d, Opción procesada: %d\n", estado, opcion); // Para depuración
         
         // Procesamiento según el estado actual con mejor manejo de errores
         switch(estado) {
             case 0: // Menú principal
                 if(opcion == 5) {
-                    send(cliente, "🚪 Sesión finalizada. ¡Gracias por su visita!\n", 45, 0);
+                    enviar_mensaje(cliente, "🚪 Sesión finalizada. ¡Gracias por su visita!\n");
                     close(cliente);
                     return;
                 }
@@ -612,7 +687,7 @@ void manejar_cliente(int cliente) {
                     snprintf(respuesta, sizeof(respuesta),
                            "📱 Categoría '%s' seleccionada\n",
                            categorias[categoria_id].nombre);
-                    send(cliente, respuesta, strlen(respuesta), 0);
+                    enviar_mensaje(cliente, respuesta);
                     
                     // Pequeña pausa para asegurar que el cliente reciba correctamente
                     usleep(100000); // 100ms
@@ -620,7 +695,7 @@ void manejar_cliente(int cliente) {
                     enviar_subcategorias(cliente, categoria_id);
                 }
                 else {
-                    send(cliente, "⚠ Opción no válida. Intente nuevamente.\n", 42, 0);
+                    enviar_mensaje(cliente, "⚠ Opción no válida. Intente nuevamente.\n");
                     // Pequeña pausa para asegurar recepción correcta
                     usleep(100000);
                     enviar_menu(cliente);
@@ -631,7 +706,7 @@ void manejar_cliente(int cliente) {
                 if(opcion == 0) {
                     estado = 0; // Volver al menú principal
                     categoria_id = -1;
-                    send(cliente, "↩ Volviendo al menú principal...\n", 32, 0);
+                    enviar_mensaje(cliente, "↩ Volviendo al menú principal...\n");
                     // Asegurar que el cliente reciba el mensaje antes del menú
                     usleep(200000); // 200ms
                     enviar_menu(cliente);
@@ -643,13 +718,13 @@ void manejar_cliente(int cliente) {
                            "🛍️ Mostrando productos de %s - %s\n",
                            categorias[categoria_id].nombre,
                            categorias[categoria_id].subcategorias[subcategoria_id].nombre);
-                    send(cliente, respuesta, strlen(respuesta), 0);
+                    enviar_mensaje(cliente, respuesta);
                     // Pequeña pausa
                     usleep(100000);
                     enviar_productos(cliente, categoria_id, subcategoria_id);
                 }
                 else {
-                    send(cliente, "⚠ Opción no válida. Intente nuevamente.\n", 42, 0);
+                    enviar_mensaje(cliente, "⚠ Opción no válida. Intente nuevamente.\n");
                     usleep(100000);
                     enviar_subcategorias(cliente, categoria_id);
                 }
@@ -658,7 +733,7 @@ void manejar_cliente(int cliente) {
             case 2: // Productos
                 if(opcion == 0) {
                     estado = 1; // Volver a selección de marcas
-                    send(cliente, "↩ Volviendo a selección de marcas...\n", 36, 0);
+                    enviar_mensaje(cliente, "↩ Volviendo a selección de marcas...\n");
                     usleep(100000); // Pequeña pausa
                     enviar_subcategorias(cliente, categoria_id);
                 }
@@ -672,9 +747,9 @@ void manejar_cliente(int cliente) {
                         
                         // Informar al usuario
                         snprintf(respuesta, sizeof(respuesta),
-                               "✅ Añadido: %s ($%.2f)\n\n¿Qué desea hacer ahora?\n1. Seguir comprando\n2. Ver carrito\n3. Menú principal\nSeleccione una opción: ",
+                               "✅ Añadido: %s ($%.2f)\n\n¿Qué desea hacer ahora?\n1. Seguir comprando\n2. Ver carrito\n3. Menú principal\nSeleccione una opción (1-3): ",
                                p.nombre, p.precio);
-                        send(cliente, respuesta, strlen(respuesta), 0);
+                        enviar_mensaje(cliente, respuesta);
                         
                         // Esperar respuesta para la navegación
                         memset(buffer, 0, sizeof(buffer));
@@ -683,7 +758,27 @@ void manejar_cliente(int cliente) {
                         buffer[bytes_recibidos] = '\0';
                         if(strchr(buffer, '\n')) *strchr(buffer, '\n') = '\0';
                         
-                        int nav_opcion = atoi(buffer);
+                        // Depuración para ver exactamente qué se recibió
+                        printf("Después de añadir producto, recibido: '%s'\n", buffer);
+                        
+                        // Validar que sea un número
+                        int nav_opcion = 0;
+                        int es_nav_numero = 1;
+                        
+                        for(int i = 0; i < strlen(buffer); i++) {
+                            if(!isdigit(buffer[i])) {
+                                es_nav_numero = 0;
+                                break;
+                            }
+                        }
+                        
+                        if(es_nav_numero && strlen(buffer) > 0) {
+                            nav_opcion = atoi(buffer);
+                        } else {
+                            // Por defecto seguir comprando si no es número válido
+                            nav_opcion = 1;
+                        }
+                        
                         if(nav_opcion == 2) {
                             estado = 3; // Ver carrito
                             mostrar_carrito(cliente);
@@ -697,13 +792,13 @@ void manejar_cliente(int cliente) {
                             enviar_productos(cliente, categoria_id, subcategoria_id);
                         }
                     } else {
-                        send(cliente, "❌ Carrito lleno (30/30 productos)\n", 34, 0);
+                        enviar_mensaje(cliente, "❌ Carrito lleno (30/30 productos)\n");
                         usleep(100000);
                         enviar_productos(cliente, categoria_id, subcategoria_id);
                     }
                 }
                 else {
-                    send(cliente, "⚠ Opción no válida. Intente nuevamente.\n", 42, 0);
+                    enviar_mensaje(cliente, "⚠ Opción no válida. Intente nuevamente.\n");
                     usleep(100000);
                     enviar_productos(cliente, categoria_id, subcategoria_id);
                 }
@@ -712,7 +807,7 @@ void manejar_cliente(int cliente) {
             case 3: // Carrito
                 if(opcion == 0) {
                     estado = 0; // Volver al menú principal
-                    send(cliente, "Volviendo al menú principal...\n", 31, 0);
+                    enviar_mensaje(cliente, "Volviendo al menú principal...\n");
                     usleep(100000);
                     enviar_menu(cliente);
                 }
@@ -721,20 +816,20 @@ void manejar_cliente(int cliente) {
                         procesar_pago(cliente);
                         estado = 4; // Ir a métodos de pago
                     } else {
-                        send(cliente, "❌ No hay productos en el carrito para pagar\n", 45, 0);
+                        enviar_mensaje(cliente, "❌ No hay productos en el carrito para pagar\n");
                         usleep(100000);
                         mostrar_carrito(cliente);
                     }
                 }
                 else if(opcion == 2) {
                     total_carrito = 0;
-                    send(cliente, "🔄 Carrito vaciado correctamente\n", 34, 0);
+                    enviar_mensaje(cliente, "🔄 Carrito vaciado correctamente\n");
                     estado = 0; // Volver al menú principal
                     usleep(100000);
                     enviar_menu(cliente);
                 }
                 else {
-                    send(cliente, "⚠ Opción no válida. Intente nuevamente.\n", 42, 0);
+                    enviar_mensaje(cliente, "⚠ Opción no válida. Intente nuevamente.\n");
                     usleep(100000);
                     mostrar_carrito(cliente);
                 }
@@ -760,7 +855,7 @@ void manejar_cliente(int cliente) {
                     enviar_menu(cliente);
                 }
                 else {
-                    send(cliente, "⚠ Opción no válida. Intente nuevamente.\n", 42, 0);
+                    enviar_mensaje(cliente, "⚠ Opción no válida. Intente nuevamente.\n");
                     usleep(100000);
                     mostrar_metodos_pago(cliente);
                 }
