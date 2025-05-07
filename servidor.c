@@ -863,7 +863,7 @@ void manejar_cliente(int cliente) {
         }
     }
     
-    // Limpieza final
+
     close(cliente);
     printf("Conexión con cliente %d cerrada\n", cliente);
 }

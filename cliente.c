@@ -139,7 +139,7 @@ int main(int argc, char *argv[]) {
     }
     printf("Conexión establecida. Bienvenido a la tienda interactiva!\n\n");
 
-    // Bucle principal mejorado
+    // Bucle principal
     while (1) {
         // Recibir menú/respuesta con mejor manejo de errores
     int bytes_recibidos = recibir_datos(socket_cliente, buffer, BUFFER_SIZE);
