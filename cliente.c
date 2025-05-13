@@ -7,8 +7,10 @@
 #include <stdio.h>           // Para printf(), perror()
 #include <string.h>          // Para memset(), strlen()
 #include <time.h>            // Para manejo de tiempos
+#include <ctype.h>           // Para isdigit()
+#include <errno.h>           // Para errno
 
-#define BUFFER_SIZE 8192     // Aumentamos aún más el tamaño para manejar respuestas grandes
+#define BUFFER_SIZE 16384    // Aumentamos mucho más el tamaño del buffer
 
 /**
  * Función para limpiar el buffer de entrada
@@ -40,58 +42,66 @@ void manejar_sync(int socket_cliente) {
 int recibir_datos(int socket_cliente, char *buffer, int buffer_size) {
     memset(buffer, 0, buffer_size);
     
-    // Recibir datos con timeout
-    fd_set read_fds;
-    struct timeval timeout;
+    // Primero recibimos la longitud esperada del mensaje
+    int longitud_esperada = 0;
+    int recibido = recv(socket_cliente, &longitud_esperada, sizeof(int), 0);
     
-    FD_ZERO(&read_fds);
-    FD_SET(socket_cliente, &read_fds);
-    
-    timeout.tv_sec = 10;  // Aumentamos a 10 segundos de timeout
-    timeout.tv_usec = 0;
-    
-    // Esperar datos con timeout
-    int ret = select(socket_cliente + 1, &read_fds, NULL, NULL, &timeout);
-    if(ret <= 0) {
-        // Timeout o error
+    if (recibido <= 0) {
         return -1;
     }
     
-    // Implementación mejorada para recibir datos completos
-    int bytes_recibidos = 0;
-    int total_recibidos = 0;
-    
-    // Leer hasta que se reciba todo el mensaje o se llene el buffer
-    while (total_recibidos < buffer_size - 1) {
-        bytes_recibidos = recv(socket_cliente, buffer + total_recibidos, buffer_size - total_recibidos - 1, 0);
-        
-        if (bytes_recibidos <= 0) {
-            break;  // Error o conexión cerrada
-        }
-        
-        total_recibidos += bytes_recibidos;
-        
-        // Comprobar si hay más datos pendientes
-        fd_set check_fds;
-        struct timeval quick_check;
-        
-        FD_ZERO(&check_fds);
-        FD_SET(socket_cliente, &check_fds);
-        
-        quick_check.tv_sec = 0;
-        quick_check.tv_usec = 100000;  // 100ms para comprobar datos adicionales
-        
-        ret = select(socket_cliente + 1, &check_fds, NULL, NULL, &quick_check);
-        if (ret <= 0) {
-            break;  // No hay más datos o error
-        }
+    // Si la longitud esperada excede nuestro buffer, ajustamos para evitar desbordamiento
+    if (longitud_esperada >= buffer_size) {
+        longitud_esperada = buffer_size - 1;
     }
     
-    if(total_recibidos > 0) {
+    int total_recibidos = 0;
+    int intentos = 0;
+    
+    // Bucle para recibir datos hasta completar o timeout
+    while (total_recibidos < longitud_esperada && intentos < 15) {
+        recibido = recv(socket_cliente, buffer + total_recibidos,
+                       buffer_size - total_recibidos - 1, 0);
+        
+        if (recibido <= 0) {
+            // Si es timeout, esperar un poco e intentar de nuevo
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                usleep(100000); // 100ms
+                intentos++;
+                continue;
+            } else {
+                // Error real o conexión cerrada
+                break;
+            }
+        }
+        
+        total_recibidos += recibido;
+        intentos = 0; // Resetear intentos si recibimos datos
+    }
+    
+    if (total_recibidos > 0) {
         buffer[total_recibidos] = '\0';
     }
     
     return total_recibidos;
+}
+
+/**
+ * Función para verificar que la entrada sea un número válido
+ */
+int es_numero_valido(const char *str) {
+    if(str == NULL || *str == '\0') {
+        return 0;  // Cadena vacía
+    }
+    
+    while(*str) {
+        if(!isdigit(*str)) {
+            return 0;  // Contiene caracteres no numéricos
+        }
+        str++;
+    }
+    
+    return 1;  // Solo contiene dígitos
 }
 
 /**
@@ -126,7 +136,7 @@ int main(int argc, char *argv[]) {
 
     // Configurar timeout para socket (evita bloqueos indefinidos)
     struct timeval tv;
-    tv.tv_sec = 10;  // 10 segundos de timeout
+    tv.tv_sec = 30;  // Aumentamos a 30 segundos de timeout
     tv.tv_usec = 0;
     setsockopt(socket_cliente, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
 
@@ -142,78 +152,83 @@ int main(int argc, char *argv[]) {
     // Bucle principal
     while (1) {
         // Recibir menú/respuesta con mejor manejo de errores
-    int bytes_recibidos = recibir_datos(socket_cliente, buffer, BUFFER_SIZE);
-    
-    if (bytes_recibidos <= 0) {
-        printf("\nLa conexión con el servidor se ha perdido o ha expirado el tiempo de espera\n");
-        break;
-    }
-    
-    // Comprobar si es un mensaje de sincronización
-    if(strncmp(buffer, "<SYNC>", 6) == 0) {
-        send(socket_cliente, "<SYNC_ACK>", 10, 0);
-        continue;
-    }
-    
-    // Mostrar lo recibido (menú, productos, etc.)
-    printf("%s", buffer);
-    
-    // Manejar salida si es el mensaje de despedida
-    if (strstr(buffer, "Sesión finalizada") != NULL || 
-        strstr(buffer, "Gracias por su compra") != NULL) {
-        printf("\nFinalizando sesión...\n");
-        break;
-    }
-
-    // Obtener entrada del usuario con mejor manejo de errores
-    memset(input, 0, sizeof(input));
-    printf("> "); // Añadir un prompt claro
-    fflush(stdout); // Forzar la salida del buffer
-
-    if (fgets(input, sizeof(input), stdin) == NULL) {
-        printf("Error de entrada. Saliendo...\n");
-        break;
-    }
-    
-    // Limpiar buffer de entrada si es necesario
-    if (strchr(input, '\n') == NULL) {
-        limpiar_buffer();
-    } else {
-        input[strcspn(input, "\n")] = 0; // Eliminar salto de línea
-    }
-    
-    // Si la entrada está vacía, proporcionar un valor por defecto
-    if (strlen(input) == 0) {
-        strcpy(input, "0");  // Opción por defecto para volver
-    }
-    
-    // Añadir mensaje de confirmación para depuración
-    printf("Enviando opción: '%s'\n", input);
-    
-    // Enviar opción al servidor con retry en caso de error
-    int intentos = 0;
-    int enviado = 0;
-    
-    while (intentos < 3 && !enviado) {
-        if (send(socket_cliente, input, strlen(input), 0) > 0) {
-            enviado = 1;
-        } else {
-            perror("Error al enviar datos");
-            intentos++;
-            usleep(500000);  // Esperar 500ms antes de reintentar
+        int bytes_recibidos = recibir_datos(socket_cliente, buffer, BUFFER_SIZE);
+        
+        if (bytes_recibidos <= 0) {
+            printf("\nLa conexión con el servidor se ha perdido o ha expirado el tiempo de espera\n");
+            break;
         }
-    }
-    
-    if (!enviado) {
-        printf("No se pudieron enviar datos al servidor después de varios intentos\n");
-        break;
-    }
+        
+        // Comprobar si es un mensaje de sincronización
+        if(strncmp(buffer, "<SYNC>", 6) == 0) {
+            send(socket_cliente, "<SYNC_ACK>", 10, 0);
+            continue;
+        }
+        
+        // Mostrar lo recibido (menú, productos, etc.)
+        printf("%s", buffer);
+        
+        // Manejar salida si es el mensaje de despedida
+        if (strstr(buffer, "Sesión finalizada") != NULL || 
+            strstr(buffer, "Gracias por su compra") != NULL) {
+            printf("\nFinalizando sesión...\n");
+            break;
+        }
 
-    // Si el usuario eligió salir (opción 5 en menú principal)
-    if (strcmp(input, "5") == 0) {
-        printf("Saliendo de la aplicación...\n");
-        break;
-    }
+        // Obtener entrada del usuario con mejor manejo de errores
+        memset(input, 0, sizeof(input));
+        printf("> "); // Añadir un prompt claro
+        fflush(stdout); // Forzar la salida del buffer
+
+        // Leer entrada del usuario
+        if (fgets(input, sizeof(input), stdin) == NULL) {
+            printf("Error de entrada. Saliendo...\n");
+            break;
+        }
+        
+        // Limpiar buffer de entrada si es necesario
+        if (strchr(input, '\n') == NULL) {
+            limpiar_buffer();
+        } else {
+            input[strcspn(input, "\n")] = 0; // Eliminar salto de línea
+        }
+        
+        // Validar entrada
+        if (strlen(input) == 0 || !es_numero_valido(input)) {
+            printf("⚠ Por favor ingrese un número válido.\n");
+            strcpy(input, "0");  // Opción por defecto segura
+        }
+        
+        // Añadir mensaje de confirmación para depuración
+        printf("Enviando opción: '%s'\n", input);
+        
+        // Enviar opción al servidor con retry en caso de error
+        int intentos = 0;
+        int enviado = 0;
+        
+        while (intentos < 3 && !enviado) {
+            if (send(socket_cliente, input, strlen(input), 0) > 0) {
+                enviado = 1;
+            } else {
+                perror("Error al enviar datos");
+                intentos++;
+                usleep(500000);  // Esperar 500ms antes de reintentar
+            }
+        }
+        
+        if (!enviado) {
+            printf("No se pudieron enviar datos al servidor después de varios intentos\n");
+            break;
+        }
+
+        // Si el usuario eligió salir (opción 5 en menú principal)
+        if (strcmp(input, "5") == 0 && strstr(buffer, "Seleccione una categoria (1-5)") != NULL) {
+            printf("Saliendo de la aplicación...\n");
+            break;
+        }
+        
+        // Pequeña pausa para dar tiempo al servidor a procesar
+        usleep(100000);  // 100ms
     }
 
     // Cierre
